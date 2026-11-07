@@ -1,0 +1,32 @@
+# Secrets (never commit)
+.env
+backend/.env
+frontend/.env
+frontend/.env.local
+
+# Python
+backend/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/coverage/
+npm-debug.log*
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Runtime storage (folders tracked via .gitkeep)
+backend/storage/uploads/*
+!backend/storage/uploads/.gitkeep
+backend/storage/chroma/*
+!backend/storage/chroma/.gitkeep
