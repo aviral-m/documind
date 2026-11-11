@@ -1,8 +1,10 @@
 import type { LucideIcon } from 'lucide-react'
-import { Library, Plus, Settings } from 'lucide-react'
-import { Link, NavLink } from 'react-router-dom'
+import { Library, LogOut, Plus, Settings } from 'lucide-react'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 
+import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 
 import { Logo } from './Logo'
@@ -12,6 +14,15 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ onNavigate }: AppSidebarProps) {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  async function handleSignOut() {
+    onNavigate?.()
+    await logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <div className="flex h-full flex-col gap-6 p-4">
       <Link to="/" onClick={onNavigate} className="px-2 py-1">
@@ -32,7 +43,20 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
 
       <div className="mt-auto flex flex-col gap-1">
         <Separator className="mb-2" />
+        {user ? (
+          <p className="truncate px-3 text-sm text-muted-foreground" title={user.email}>
+            {user.name ?? user.email}
+          </p>
+        ) : null}
         <SidebarLink to="/settings" label="Settings" icon={Settings} onNavigate={onNavigate} />
+        <Button
+          variant="ghost"
+          className="justify-start gap-3 px-3 text-sidebar-foreground/80"
+          onClick={handleSignOut}
+        >
+          <LogOut className="size-4" aria-hidden />
+          Sign out
+        </Button>
       </div>
     </div>
   )

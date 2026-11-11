@@ -1,10 +1,14 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ENV_FILE = BACKEND_DIR / ".env"
+
+PLACEHOLDER_AUTH_SECRET = "change-me-to-a-long-random-string"
 
 
 class Settings(BaseSettings):
@@ -20,6 +24,34 @@ class Settings(BaseSettings):
     test_database_url: str = ""
     cors_origins: str = "http://localhost:5173"
     storage_dir: str = "storage"
+    frontend_base_url: str = "http://localhost:5173"
+
+    auth_secret: str = PLACEHOLDER_AUTH_SECRET
+    access_token_ttl_minutes: int = 15
+    refresh_token_ttl_days: int = 30
+    email_verification_ttl_hours: int = 24
+    password_reset_ttl_minutes: int = 60
+
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    github_client_id: str = ""
+    github_client_secret: str = ""
+    oauth_redirect_base_url: str = "http://localhost:5173"
+
+    email_backend: Literal["console", "smtp"] = "console"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+
+    @model_validator(mode="after")
+    def check_auth_secret(self) -> "Settings":
+        if self.app_env != "development" and (
+            self.auth_secret == PLACEHOLDER_AUTH_SECRET or len(self.auth_secret) < 32
+        ):
+            raise ValueError("AUTH_SECRET must be a random string of at least 32 characters")
+        return self
 
     @property
     def cors_origin_list(self) -> list[str]:

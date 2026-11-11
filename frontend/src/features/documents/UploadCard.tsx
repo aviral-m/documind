@@ -98,7 +98,12 @@ export function UploadCard() {
                 <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" aria-label="Remove file" onClick={() => setFile(null)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Remove file"
+              onClick={() => setFile(null)}
+            >
               <X />
             </Button>
           </div>
