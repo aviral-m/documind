@@ -1,12 +1,13 @@
 import { Library } from 'lucide-react'
 
 import { EmptyState } from '@/components/EmptyState'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { DocumentCard } from '@/features/documents/DocumentCard'
-import type { DocumentSummary } from '@/types/document'
+import { useDocuments } from '@/hooks/useDocuments'
 
 export function DocumentsPage() {
-  // Phase 2 replaces this with documents loaded from the API.
-  const documents: DocumentSummary[] = []
+  const { data: documents, isPending, isError, refetch } = useDocuments()
 
   return (
     <div className="flex flex-col gap-8">
@@ -15,11 +16,26 @@ export function DocumentsPage() {
         <p className="text-muted-foreground">Your documents and their processing status.</p>
       </header>
 
-      {documents.length === 0 ? (
+      {isPending ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-start gap-3">
+          <p role="alert" className="text-sm text-destructive">
+            Couldn't load your library.
+          </p>
+          <Button variant="outline" onClick={() => refetch()}>
+            Try again
+          </Button>
+        </div>
+      ) : documents.length === 0 ? (
         <EmptyState
           icon={Library}
           title="Your library is empty"
-          description="Uploaded documents will appear here once uploads are available in Phase 2."
+          description="Upload a PDF from the dashboard to get started."
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     test_database_url: str = ""
     cors_origins: str = "http://localhost:5173"
     storage_dir: str = "storage"
+    max_upload_mb: int = 50
+    max_pages: int = 500
     frontend_base_url: str = "http://localhost:5173"
 
     auth_secret: str = PLACEHOLDER_AUTH_SECRET

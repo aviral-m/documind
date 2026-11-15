@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useUploadDocument } from '@/hooks/useDocuments'
 import { cn } from '@/lib/utils'
 
 const MAX_FILE_SIZE_MB = 50
@@ -22,6 +23,7 @@ export function UploadCard() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const upload = useUploadDocument()
 
   function selectFile(candidate: File | undefined) {
     if (!candidate) return
@@ -33,7 +35,23 @@ export function UploadCard() {
       toast.error(`Files must be ${MAX_FILE_SIZE_MB} MB or smaller.`)
       return
     }
+    upload.reset()
     setFile(candidate)
+  }
+
+  function clearFile() {
+    upload.reset()
+    setFile(null)
+  }
+
+  function startUpload() {
+    if (!file) return
+    upload.mutate(file, {
+      onSuccess: () => {
+        toast.success('Upload complete. Processing will start shortly.')
+        setFile(null)
+      },
+    })
   }
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
@@ -102,16 +120,23 @@ export function UploadCard() {
               variant="ghost"
               size="icon"
               aria-label="Remove file"
-              onClick={() => setFile(null)}
+              disabled={upload.isPending}
+              onClick={clearFile}
             >
               <X />
             </Button>
           </div>
         ) : null}
 
+        {upload.isError ? (
+          <p role="alert" className="text-sm text-destructive">
+            {upload.error instanceof Error ? upload.error.message : 'Upload failed. Try again.'}
+          </p>
+        ) : null}
+
         <div className="flex justify-end">
-          <Button disabled title="Document upload arrives in Phase 2">
-            Upload (Phase 2)
+          <Button disabled={!file || upload.isPending} onClick={startUpload}>
+            {upload.isPending ? 'Uploading…' : 'Upload'}
           </Button>
         </div>
       </CardContent>

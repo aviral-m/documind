@@ -3,8 +3,13 @@ import { Link } from 'react-router-dom'
 
 import { EmptyState } from '@/components/EmptyState'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { DocumentCard } from '@/features/documents/DocumentCard'
 import { UploadCard } from '@/features/documents/UploadCard'
 import { BackendStatusPill } from '@/features/health/BackendStatusPill'
+import { useDocuments } from '@/hooks/useDocuments'
+
+const RECENT_DOCUMENT_LIMIT = 5
 
 const quickStarts = [
   {
@@ -25,6 +30,9 @@ const quickStarts = [
 ]
 
 export function DashboardPage() {
+  const { data: documents, isPending } = useDocuments()
+  const recent = documents?.slice(0, RECENT_DOCUMENT_LIMIT) ?? []
+
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -41,11 +49,21 @@ export function DashboardPage() {
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Recent documents</h2>
-        <EmptyState
-          icon={Inbox}
-          title="No documents yet"
-          description="Documents you upload will appear here."
-        />
+        {isPending ? (
+          <Skeleton className="h-24" />
+        ) : recent.length === 0 ? (
+          <EmptyState
+            icon={Inbox}
+            title="No documents yet"
+            description="Documents you upload will appear here."
+          />
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {recent.map((item) => (
+              <DocumentCard key={item.id} item={item} />
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="flex flex-col gap-3">

@@ -5,4 +5,8 @@ export interface DocumentSummary {
   filename: string
   status: DocumentStatus
   pageCount: number | null
+  sizeBytes: number
+  errorMessage: string | null
+  createdAt: string
+  updatedAt: string
 }

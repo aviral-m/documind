@@ -10,6 +10,7 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.session import engine
+from app.services.document_service import recover_stuck_documents_on_startup
 
 logger = logging.getLogger("documind")
 
@@ -17,6 +18,7 @@ logger = logging.getLogger("documind")
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("DocuMind backend starting (env=%s)", get_settings().app_env)
+    recover_stuck_documents_on_startup()
     yield
     engine.dispose()
     logger.info("DocuMind backend stopped")

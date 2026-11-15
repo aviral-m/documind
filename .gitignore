@@ -28,5 +28,3 @@ Thumbs.db
 # Runtime storage (folders tracked via .gitkeep)
 backend/storage/uploads/*
 !backend/storage/uploads/.gitkeep
-backend/storage/chroma/*
-!backend/storage/chroma/.gitkeep

@@ -13,7 +13,8 @@ export class ApiError extends Error {
 }
 
 export interface RequestOptions {
-  method?: 'GET' | 'POST'
+  method?: 'GET' | 'POST' | 'DELETE'
+  /** Objects are sent as JSON. FormData is sent as-is so the browser sets the multipart boundary. */
   body?: unknown
   signal?: AbortSignal
   timeoutMs?: number
@@ -71,15 +72,17 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
   const abortFromCaller = () => controller.abort()
   signal?.addEventListener('abort', abortFromCaller)
 
+  const isFormData = body instanceof FormData
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  if (body !== undefined && !isFormData) headers['Content-Type'] = 'application/json'
   if (authenticated && accessToken) headers.Authorization = `Bearer ${accessToken}`
 
   try {
     return await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body:
+        body === undefined || isFormData ? (body as BodyInit | undefined) : JSON.stringify(body),
       signal: controller.signal,
     })
   } catch {
