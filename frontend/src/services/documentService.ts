@@ -8,6 +8,9 @@ interface DocumentDto {
   page_count: number | null
   size_bytes: number
   error_message: string | null
+  index_status: DocumentSummary['indexStatus']
+  index_error: string | null
+  chunk_count: number | null
   created_at: string
   updated_at: string
 }
@@ -23,6 +26,9 @@ function toDocument(dto: DocumentDto): DocumentSummary {
     pageCount: dto.page_count,
     sizeBytes: dto.size_bytes,
     errorMessage: dto.error_message,
+    indexStatus: dto.index_status,
+    indexError: dto.index_error,
+    chunkCount: dto.chunk_count,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
   }
@@ -45,6 +51,14 @@ export const documentService = {
       body: form,
       authenticated: true,
       timeoutMs: UPLOAD_TIMEOUT_MS,
+    })
+    return toDocument(document)
+  },
+
+  async reindex(id: string): Promise<DocumentSummary> {
+    const document = await apiRequest<DocumentDto>(`/documents/${id}/reindex`, {
+      method: 'POST',
+      authenticated: true,
     })
     return toDocument(document)
   },

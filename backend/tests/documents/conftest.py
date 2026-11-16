@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.db.session import get_db
 from app.main import create_app
 from app.models import User
+from app.services.embedder import get_embedder
 from app.services.storage import DOWNLOAD_FAILED_MESSAGE, StorageError
 
 
@@ -52,12 +53,13 @@ def session_factory(db):
 
 
 @pytest.fixture
-def client(db, settings, storage, session_factory):
+def client(db, settings, storage, session_factory, embedder):
     app = create_app()
     app.dependency_overrides[get_db] = lambda: db
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_file_storage] = lambda: storage
     app.dependency_overrides[get_session_factory] = lambda: session_factory
+    app.dependency_overrides[get_embedder] = lambda: embedder
     return TestClient(app)
 
 

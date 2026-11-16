@@ -6,6 +6,7 @@ from sqlalchemy.pool import StaticPool
 import app.models  # noqa: F401  (registers tables on Base.metadata)
 from app.core.config import Settings
 from app.db.base import Base
+from tests.fakes import FakeEmbedder
 
 
 @pytest.fixture
@@ -17,6 +18,11 @@ def settings() -> Settings:
         frontend_base_url="http://app.test",
         cors_origins="http://localhost:5173",
     )
+
+
+@pytest.fixture
+def embedder():
+    return FakeEmbedder()
 
 
 @pytest.fixture

@@ -16,6 +16,7 @@ vi.mock('@/services/documentService', () => ({
     list: vi.fn(),
     upload: vi.fn(),
     delete: vi.fn(),
+    reindex: vi.fn(),
   },
 }))
 
@@ -27,6 +28,9 @@ function doc(overrides: Partial<DocumentSummary>): DocumentSummary {
     pageCount: 12,
     sizeBytes: 2048,
     errorMessage: null,
+    indexStatus: null,
+    indexError: null,
+    chunkCount: null,
     createdAt: '2026-11-12T10:00:00Z',
     updatedAt: '2026-11-12T10:00:00Z',
     ...overrides,
@@ -66,6 +70,32 @@ describe('library page', () => {
     expect(screen.getByText('12 pages')).toBeInTheDocument()
     expect(screen.getByText('Failed')).toBeInTheDocument()
     expect(screen.getByText("No extractable text. OCR isn't supported yet.")).toBeInTheDocument()
+  })
+
+  it('shows the indexing stage, chunk count, and index failure with a retry', async () => {
+    vi.mocked(documentService.list).mockResolvedValue([
+      doc({ id: 'a', filename: 'indexing.pdf', indexStatus: 'indexing' }),
+      doc({ id: 'b', filename: 'ready.pdf', indexStatus: 'indexed', chunkCount: 42 }),
+      doc({
+        id: 'c',
+        filename: 'broken.pdf',
+        indexStatus: 'failed',
+        indexError: 'Indexing failed. Please try again.',
+      }),
+    ])
+    vi.mocked(documentService.reindex).mockResolvedValue(doc({ id: 'c', indexStatus: 'pending' }))
+
+    renderWithClient(<DocumentsPage />)
+
+    expect(await screen.findByText('Indexing…')).toBeInTheDocument()
+    expect(screen.getByText('Ready to search · 42 chunks')).toBeInTheDocument()
+    expect(screen.getByText('Indexing failed')).toBeInTheDocument()
+    expect(screen.getByText('Indexing failed. Please try again.')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(1)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
+
+    expect(documentService.reindex).toHaveBeenCalledWith('c')
   })
 
   it('shows the empty state when there are no documents', async () => {

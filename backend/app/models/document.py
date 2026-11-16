@@ -11,6 +11,11 @@ PROCESSING = "processing"
 COMPLETED = "completed"
 FAILED = "failed"
 
+INDEX_PENDING = "pending"
+INDEX_INDEXING = "indexing"
+INDEX_INDEXED = "indexed"
+INDEX_FAILED = "failed"
+
 
 class Document(Base):
     __tablename__ = "documents"
@@ -25,6 +30,13 @@ class Document(Base):
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(16))
     error_message: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    index_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    index_error: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    chunk_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    embedding_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    chunk_target_chars: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    chunk_overlap_chars: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

@@ -23,6 +23,14 @@ export function useUploadDocument() {
   })
 }
 
+export function useReindexDocument() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => documentService.reindex(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: documentsQueryKey }),
+  })
+}
+
 export function useDeleteDocument() {
   const queryClient = useQueryClient()
   return useMutation({

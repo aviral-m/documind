@@ -7,14 +7,18 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.auth.dependencies import VerifiedUser
 from app.core.config import Settings, get_settings
 from app.db.session import SessionLocal, get_db
+from app.rag.embeddings import Embedder
 from app.schemas.documents import DocumentResponse
 from app.services import document_service
-from app.services.document_service import DocumentNotFound, UploadRejected
+from app.services.document_service import DocumentNotFound, ReindexRejected, UploadRejected
+from app.services.embedder import get_embedder
+from app.services.indexing_service import index_document
 from app.services.storage import CloudinaryStorage, FileStorage, StorageError
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 DbSession = Annotated[Session, Depends(get_db)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+EmbedderDep = Annotated[Embedder, Depends(get_embedder)]
 
 
 def get_session_factory() -> sessionmaker[Session]:
@@ -43,6 +47,7 @@ def upload_document(
     settings: SettingsDep,
     storage: StorageDep,
     session_factory: SessionFactoryDep,
+    embedder: EmbedderDep,
 ) -> DocumentResponse:
     try:
         document = document_service.store_upload(db, settings, storage, user, file)
@@ -51,7 +56,12 @@ def upload_document(
     except StorageError as exc:
         raise HTTPException(status_code=503, detail=exc.message) from exc
     background_tasks.add_task(
-        document_service.process_document, session_factory, settings, storage, document.id
+        document_service.process_document,
+        session_factory,
+        settings,
+        storage,
+        embedder,
+        document.id,
     )
     return DocumentResponse.model_validate(document)
 
@@ -68,6 +78,26 @@ def get_document(document_id: uuid.UUID, user: VerifiedUser, db: DbSession) -> D
         document = document_service.get_user_document(db, user, document_id)
     except DocumentNotFound as exc:
         raise HTTPException(status_code=404, detail="Document not found.") from exc
+    return DocumentResponse.model_validate(document)
+
+
+@router.post("/{document_id}/reindex", status_code=202, response_model=DocumentResponse)
+def reindex_document(
+    document_id: uuid.UUID,
+    user: VerifiedUser,
+    background_tasks: BackgroundTasks,
+    db: DbSession,
+    settings: SettingsDep,
+    session_factory: SessionFactoryDep,
+    embedder: EmbedderDep,
+) -> DocumentResponse:
+    try:
+        document = document_service.request_reindex(db, settings, user, document_id)
+    except DocumentNotFound as exc:
+        raise HTTPException(status_code=404, detail="Document not found.") from exc
+    except ReindexRejected as exc:
+        raise HTTPException(status_code=409, detail=exc.message) from exc
+    background_tasks.add_task(index_document, session_factory, settings, embedder, document.id)
     return DocumentResponse.model_validate(document)
 
 

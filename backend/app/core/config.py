@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     max_upload_mb: int = 10
     max_pages: int = 500
     frontend_base_url: str = "http://localhost:5173"
+
+    gemini_api_key: str = ""
+    embedding_model: str = "gemini-embedding-001"
+    # Must match the vector(768) column in document_chunks. Changing it needs a migration.
+    embedding_dimensions: Literal[768] = 768
+    embedding_batch_size: int = Field(default=100, ge=1, le=100)
+    chunk_target_chars: int = Field(default=1000, ge=100)
+    chunk_overlap_chars: int = Field(default=150, ge=0)
 
     auth_secret: str = PLACEHOLDER_AUTH_SECRET
     access_token_ttl_minutes: int = 15
@@ -53,6 +61,8 @@ class Settings(BaseSettings):
             self.auth_secret == PLACEHOLDER_AUTH_SECRET or len(self.auth_secret) < 32
         ):
             raise ValueError("AUTH_SECRET must be a random string of at least 32 characters")
+        if self.chunk_overlap_chars >= self.chunk_target_chars:
+            raise ValueError("CHUNK_OVERLAP_CHARS must be smaller than CHUNK_TARGET_CHARS")
         return self
 
     @property
