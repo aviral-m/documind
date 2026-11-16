@@ -5,17 +5,45 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
-from app.api.routes.documents import get_session_factory
+from app.api.routes.documents import get_file_storage, get_session_factory
 from app.auth.tokens import create_access_token
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.main import create_app
 from app.models import User
+from app.services.storage import DOWNLOAD_FAILED_MESSAGE, StorageError
+
+
+class FakeStorage:
+    """In-memory stand-in for CloudinaryStorage. No network."""
+
+    def __init__(self) -> None:
+        self.files: dict[str, bytes] = {}
+        self.fail_save: str | None = None
+        self.fail_download = False
+        self.fail_delete = False
+
+    def save(self, public_id: str, data: bytes) -> None:
+        if self.fail_save:
+            raise StorageError(self.fail_save)
+        if public_id in self.files:
+            raise StorageError("already exists")
+        self.files[public_id] = data
+
+    def download(self, public_id: str) -> bytes:
+        if self.fail_download or public_id not in self.files:
+            raise StorageError(DOWNLOAD_FAILED_MESSAGE)
+        return self.files[public_id]
+
+    def delete(self, public_id: str) -> None:
+        if self.fail_delete:
+            raise StorageError("Cloudinary could not delete.")
+        self.files.pop(public_id, None)
 
 
 @pytest.fixture
-def storage_settings(settings, tmp_path):
-    return settings.model_copy(update={"storage_dir": str(tmp_path)})
+def storage() -> FakeStorage:
+    return FakeStorage()
 
 
 @pytest.fixture
@@ -24,10 +52,11 @@ def session_factory(db):
 
 
 @pytest.fixture
-def client(db, storage_settings, session_factory):
+def client(db, settings, storage, session_factory):
     app = create_app()
     app.dependency_overrides[get_db] = lambda: db
-    app.dependency_overrides[get_settings] = lambda: storage_settings
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_file_storage] = lambda: storage
     app.dependency_overrides[get_session_factory] = lambda: session_factory
     return TestClient(app)
 
@@ -44,9 +73,9 @@ def make_user(db):
 
 
 @pytest.fixture
-def auth_headers(storage_settings):
+def auth_headers(settings):
     def _headers(user: User) -> dict[str, str]:
-        token = create_access_token(user.id, storage_settings.auth_secret, 15)
+        token = create_access_token(user.id, settings.auth_secret, 15)
         return {"Authorization": f"Bearer {token}"}
 
     return _headers

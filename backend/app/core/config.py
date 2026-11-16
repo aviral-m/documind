@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     database_url: str
     test_database_url: str = ""
     cors_origins: str = "http://localhost:5173"
-    storage_dir: str = "storage"
-    max_upload_mb: int = 50
+    cloudinary_url: str = ""
+    max_upload_mb: int = 10
     max_pages: int = 500
     frontend_base_url: str = "http://localhost:5173"
 
@@ -58,11 +58,6 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
-
-    @property
-    def storage_path(self) -> Path:
-        path = Path(self.storage_dir)
-        return path if path.is_absolute() else BACKEND_DIR / path
 
 
 @lru_cache

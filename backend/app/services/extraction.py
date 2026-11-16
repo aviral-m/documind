@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pymupdf
 
 UNREADABLE_MESSAGE = "This file couldn't be read. It may be damaged."
@@ -13,10 +11,10 @@ class ExtractionError(Exception):
         self.message = message
 
 
-def extract_pages(path: Path, max_pages: int) -> list[str]:
+def extract_pages(data: bytes, max_pages: int) -> list[str]:
     """Returns each page's text in order. Raises ExtractionError with a user-facing message."""
     try:
-        document = pymupdf.open(path)
+        document = pymupdf.open(stream=data, filetype="pdf")
     except Exception as exc:
         raise ExtractionError(UNREADABLE_MESSAGE) from exc
 

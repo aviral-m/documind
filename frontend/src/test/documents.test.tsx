@@ -136,6 +136,20 @@ describe('upload card', () => {
     await waitFor(() => expect(documentService.upload).toHaveBeenCalledWith(file))
   })
 
+  it('rejects a file over 10 MB without uploading it', async () => {
+    const { container } = renderWithClient(<UploadCard />)
+    const tooBig = new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'big.pdf', {
+      type: 'application/pdf',
+    })
+
+    pickFile(container, tooBig)
+
+    expect(await screen.findByText('PDF only, up to 10 MB.')).toBeInTheDocument()
+    expect(screen.queryByText('big.pdf')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Upload' })).toBeDisabled()
+    expect(documentService.upload).not.toHaveBeenCalled()
+  })
+
   it('shows the server error on the card when the upload fails', async () => {
     vi.mocked(documentService.upload).mockRejectedValue(
       new ApiError('This PDF has more than 500 pages.', 422),

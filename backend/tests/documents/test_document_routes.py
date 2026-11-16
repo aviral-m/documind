@@ -1,10 +1,12 @@
 import uuid
 
+import pytest
 from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.models import Document, DocumentPage
 from app.services.document_service import GENERIC_FAILURE_MESSAGE
+from app.services.storage import DOWNLOAD_FAILED_MESSAGE, QUOTA_MESSAGE
 
 BASE = "/api/v1/documents"
 
@@ -45,20 +47,36 @@ def test_upload_is_extracted_into_pages(client, make_user, auth_headers, make_pd
     assert "Second page text" in pages[1].text
 
 
-def test_non_pdf_content_is_rejected_even_with_pdf_name(client, make_user, auth_headers, db):
+def test_upload_is_stored_as_private_file_under_user_and_document_id(
+    client, make_user, auth_headers, make_pdf, db, storage
+):
+    user = make_user()
+    content = make_pdf(["Some text"])
+
+    document_id = upload(client, auth_headers(user), content).json()["id"]
+
+    expected = f"documind/{user.id}/{document_id}"
+    assert storage.files == {expected: content}
+    assert db.get(Document, uuid.UUID(document_id)).storage_path == expected
+
+
+def test_non_pdf_content_is_rejected_even_with_pdf_name(
+    client, make_user, auth_headers, db, storage
+):
     user = make_user()
 
     response = upload(client, auth_headers(user), b"just some text", filename="notes.pdf")
 
     assert response.status_code == 415
     assert db.scalars(select(Document)).all() == []
+    assert storage.files == {}
 
 
 def test_oversized_upload_is_rejected_and_not_kept(
-    client, make_user, auth_headers, storage_settings, tmp_path
+    client, make_user, auth_headers, settings, storage
 ):
     user = make_user()
-    client.app.dependency_overrides[get_settings] = lambda: storage_settings.model_copy(
+    client.app.dependency_overrides[get_settings] = lambda: settings.model_copy(
         update={"max_upload_mb": 1}
     )
     too_big = b"%PDF-" + b"0" * (1024 * 1024)
@@ -66,7 +84,42 @@ def test_oversized_upload_is_rejected_and_not_kept(
     response = upload(client, auth_headers(user), too_big)
 
     assert response.status_code == 413
-    assert list(tmp_path.rglob("*.pdf")) == []
+    assert response.json()["detail"] == "Files must be 1 MB or smaller."
+    assert storage.files == {}
+
+
+def test_default_upload_limit_is_10_mb(settings):
+    assert settings.max_upload_mb == 10
+
+
+def test_storage_failure_on_upload_returns_its_message_and_keeps_nothing(
+    client, make_user, auth_headers, make_pdf, db, storage
+):
+    user = make_user()
+    storage.fail_save = QUOTA_MESSAGE
+
+    response = upload(client, auth_headers(user), make_pdf(["text"]))
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == QUOTA_MESSAGE
+    assert db.scalars(select(Document)).all() == []
+    assert storage.files == {}
+
+
+def test_storage_file_is_removed_when_the_database_insert_fails(
+    client, make_user, auth_headers, make_pdf, db, storage, monkeypatch
+):
+    user = make_user()
+
+    def fail_commit():
+        raise RuntimeError("database went away")
+
+    monkeypatch.setattr(db, "commit", fail_commit)
+
+    with pytest.raises(RuntimeError):
+        upload(client, auth_headers(user), make_pdf(["text"]))
+
+    assert storage.files == {}
 
 
 def test_blank_pdf_is_marked_failed_without_text(client, make_user, auth_headers, make_pdf):
@@ -91,6 +144,20 @@ def test_damaged_pdf_is_marked_failed(client, make_user, auth_headers):
     assert body["error_message"]
 
 
+def test_document_is_marked_failed_when_the_file_cannot_be_downloaded(
+    client, make_user, auth_headers, make_pdf, storage
+):
+    user = make_user()
+    headers = auth_headers(user)
+    storage.fail_download = True
+
+    document_id = upload(client, headers, make_pdf(["text"])).json()["id"]
+
+    body = client.get(f"{BASE}/{document_id}", headers=headers).json()
+    assert body["status"] == "failed"
+    assert body["error_message"] == DOWNLOAD_FAILED_MESSAGE
+
+
 def test_library_lists_only_the_current_users_documents(client, make_user, auth_headers, make_pdf):
     alice = make_user()
     bob = make_user()
@@ -113,23 +180,36 @@ def test_other_users_document_looks_missing(client, make_user, auth_headers, mak
     assert client.get(f"{BASE}/{uuid.uuid4()}", headers=auth_headers(alice)).status_code == 404
 
 
-def test_delete_removes_rows_and_file(
-    client, make_user, auth_headers, make_pdf, db, storage_settings
+def test_delete_removes_rows_and_remote_file(
+    client, make_user, auth_headers, make_pdf, db, storage
 ):
     user = make_user()
     headers = auth_headers(user)
     document_id = upload(client, headers, make_pdf(["Some text"])).json()["id"]
     stored = db.get(Document, uuid.UUID(document_id)).storage_path
-    file_path = storage_settings.storage_path / stored
-    assert file_path.exists()
+    assert stored in storage.files
 
     response = client.delete(f"{BASE}/{document_id}", headers=headers)
 
     assert response.status_code == 204
-    assert not file_path.exists()
+    assert stored not in storage.files
     assert db.get(Document, uuid.UUID(document_id)) is None
     assert db.scalars(select(DocumentPage)).all() == []
     assert client.get(f"{BASE}/{document_id}", headers=headers).status_code == 404
+
+
+def test_delete_still_removes_rows_when_remote_delete_fails(
+    client, make_user, auth_headers, make_pdf, db, storage
+):
+    user = make_user()
+    headers = auth_headers(user)
+    document_id = upload(client, headers, make_pdf(["Some text"])).json()["id"]
+    storage.fail_delete = True
+
+    response = client.delete(f"{BASE}/{document_id}", headers=headers)
+
+    assert response.status_code == 204
+    assert db.get(Document, uuid.UUID(document_id)) is None
 
 
 def test_unverified_user_is_forbidden(client, make_user, auth_headers):
